@@ -4,15 +4,14 @@ MAX30112::MAX30112() {
       //Constructor
   }
 
-boolean MAX30112::begin(TwoWire &wirePort, uint32_t i2cSpeed, uint8_t i2creadaddr, uint8_t i2cwriteaddr) {
+boolean MAX30112::begin(TwoWire &wirePort, uint32_t i2cSpeed, uint8_t i2caddr) {
 
     _i2cPort = &wirePort; //Grab which port the user wants us to use
 
     _i2cPort->begin();
     _i2cPort->setClock(i2cSpeed);
 
-    _i2creadaddr = i2creadaddr;
-    _i2cwriteaddr = i2cwriteaddr;
+    _i2caddr = i2caddr;
 
     // Step 1: Initial Communication and Verification
     // Check that a MAX30112 is connected
@@ -82,12 +81,12 @@ void MAX30112::setPulseWidth(uint8_t pulseWidth){ //Use MAX30112_TINT_XXX comman
   }
 
 void MAX30112::setPulseAmplitudeRed(uint8_t power, uint8_t value){ //Set max power and percentage of that power (0-255 = 0%-100%) to pulse LEDs
-    writeRegister8(_i2cwriteaddr, MAX30112_LED1_PA, power);
+    writeRegister8(_i2caddr, MAX30112_LED1_PA, power);
     bitMask(MAX30112_LED_RGE, MAX30112_LED1_RGE_MASK, value);
   }
 
 void MAX30112::setPulseAmplitudeIR(uint8_t power, uint8_t value){
-    writeRegister8(_i2cwriteaddr, MAX30112_LED2_PA, power);
+    writeRegister8(_i2caddr, MAX30112_LED2_PA, power);
     bitMask(MAX30112_LED_RGE,MAX30112_LED2_RGE_MASK,value);
   }
 
@@ -119,7 +118,7 @@ uint16_t MAX30112::check(void)
     int bytesLeftToRead = numberOfSamples * activeLEDs * 3;
 
     //Get ready to read a burst of data from the FIFO register - MAX30105 code
-    _i2cPort->beginTransmission(_i2creadaddr);
+    _i2cPort->beginTransmission(_i2caddr);
     _i2cPort->write(MAX30112_FIFO_DATA);
     _i2cPort->endTransmission();
 
@@ -141,7 +140,7 @@ uint16_t MAX30112::check(void)
       bytesLeftToRead -= toGet;
 
       //Request toGet number of bytes from sensor
-      _i2cPort->requestFrom(_i2creadaddr, toGet);
+      _i2cPort->requestFrom(_i2caddr, toGet);
       
       while (toGet > 0)
       {
@@ -246,26 +245,26 @@ uint32_t MAX30112::getFIFOIR(void){
 
 //Read the FIFO Write Pointer
 uint8_t MAX30112::getWritePointer(void) {
-    return (readRegister8(_i2creadaddr, MAX30112_FIFO_WR_PTR));
+    return (readRegister8(_i2caddr, MAX30112_FIFO_WR_PTR));
   }
 
 //Read the FIFO Read Pointer
 uint8_t MAX30112::getReadPointer(void) {
-    return (readRegister8(_i2creadaddr, MAX30112_FIFO_RD_PTR));
+    return (readRegister8(_i2caddr, MAX30112_FIFO_RD_PTR));
   }
 
 uint8_t MAX30112::getOverflowCounter(void) {
-    return (readRegister8(_i2creadaddr, MAX30112_OVF_COUNTER));
+    return (readRegister8(_i2caddr, MAX30112_OVF_COUNTER));
 }
 
 void MAX30112::clearFIFO(void) {
-  writeRegister8(_i2cwriteaddr, MAX30112_FIFO_WR_PTR, 0x00);
-  writeRegister8(_i2cwriteaddr, MAX30112_OVF_COUNTER, 0x00);
-  writeRegister8(_i2cwriteaddr, MAX30112_FIFO_RD_PTR, 0x00);
+  writeRegister8(_i2caddr, MAX30112_FIFO_WR_PTR, 0x00);
+  writeRegister8(_i2caddr, MAX30112_OVF_COUNTER, 0x00);
+  writeRegister8(_i2caddr, MAX30112_FIFO_RD_PTR, 0x00);
 } //Sets the read/write pointers to zero
 
 uint8_t MAX30112::readPartID(){
-  return (readRegister8(_i2creadaddr, MAX30112_PARTID));
+  return (readRegister8(_i2caddr, MAX30112_PARTID));
   }
 
 // Setup the IC with user selectable settings
@@ -274,28 +273,16 @@ void MAX30112::setup( uint8_t ledMode, uint8_t LEDpower, uint8_t LEDintensity, u
     //Set LED mode
     activeLEDs = ledMode;
     if(ledMode == 1){
-      bitMask(MAX30112_DATCTRL1,MAX30112_FD1_MASK,MAX30112_FD_MODE_LED1);
-      bitMask(MAX30112_DATCTRL1,MAX30112_FD2_MASK,MAX30112_FD_MODE_NONE);
-      bitMask(MAX30112_DATCTRL2,MAX30112_FD3_MASK,MAX30112_FD_MODE_NONE);
-      bitMask(MAX30112_DATCTRL2,MAX30112_FD4_MASK,MAX30112_FD_MODE_NONE);
+      setLEDMode(MAX30112_FD_MODE_LED1,MAX30112_FD_MODE_NONE,MAX30112_FD_MODE_NONE,MAX30112_FD_MODE_NONE);
     }
     else if(ledMode == 2){
-      bitMask(MAX30112_DATCTRL1,MAX30112_FD1_MASK,MAX30112_FD_MODE_LED1);
-      bitMask(MAX30112_DATCTRL1,MAX30112_FD2_MASK,MAX30112_FD_MODE_LED2);
-      bitMask(MAX30112_DATCTRL2,MAX30112_FD3_MASK,MAX30112_FD_MODE_NONE);
-      bitMask(MAX30112_DATCTRL2,MAX30112_FD4_MASK,MAX30112_FD_MODE_NONE);
+      setLEDMode(MAX30112_FD_MODE_LED1,MAX30112_FD_MODE_LED2,MAX30112_FD_MODE_NONE,MAX30112_FD_MODE_NONE);
     }
     else if(ledMode == 3){
-      bitMask(MAX30112_DATCTRL1,MAX30112_FD1_MASK,MAX30112_FD_MODE_LED1);
-      bitMask(MAX30112_DATCTRL1,MAX30112_FD2_MASK,MAX30112_FD_MODE_LED2);
-      bitMask(MAX30112_DATCTRL2,MAX30112_FD3_MASK,MAX30112_FD_MODE_AMBIENT);
-      bitMask(MAX30112_DATCTRL2,MAX30112_FD4_MASK,MAX30112_FD_MODE_NONE);
+      setLEDMode(MAX30112_FD_MODE_LED1,MAX30112_FD_MODE_LED2,MAX30112_FD_MODE_AMBIENT,MAX30112_FD_MODE_NONE);
     }
     else if(ledMode == 4){
-      bitMask(MAX30112_DATCTRL1,MAX30112_FD1_MASK,MAX30112_FD_MODE_LED1);
-      bitMask(MAX30112_DATCTRL1,MAX30112_FD2_MASK,MAX30112_FD_MODE_LED2);
-      bitMask(MAX30112_DATCTRL2,MAX30112_FD3_MASK,MAX30112_FD_MODE_AMBIENT);
-      bitMask(MAX30112_DATCTRL2,MAX30112_FD4_MASK,MAX30112_FD_MODE_LED1P2);
+      setLEDMode(MAX30112_FD_MODE_LED1,MAX30112_FD_MODE_LED2,MAX30112_FD_MODE_AMBIENT,MAX30112_FD_MODE_LED1P2);
     }
     //Set LED_PA and LED_RGE
     setPulseAmplitudeRed(LEDpower, LEDintensity);
@@ -323,13 +310,13 @@ void MAX30112::setup( uint8_t ledMode, uint8_t LEDpower, uint8_t LEDintensity, u
 void MAX30112::bitMask(uint8_t reg, uint8_t mask, uint8_t thing)
 {
   // Grab current register context
-  uint8_t originalContents = readRegister8(_i2creadaddr, reg);
+  uint8_t originalContents = readRegister8(_i2caddr, reg);
 
   // Zero-out the portions of the register we're interested in
   originalContents = originalContents & mask;
 
   // Change contents
-  writeRegister8(_i2cwriteaddr, reg, originalContents | thing);
+  writeRegister8(_i2caddr, reg, originalContents | thing);
 }
 
 //

@@ -12,8 +12,7 @@
 
 #include <Wire.h>
 
-#define MAX30112_READ_ADDRESS          0xC1 //7-bit I2C Address
-#define MAX30112_WRITE_ADDRESS         0xC0 //Begin with this address for write mode.
+#define MAX30112_ADDRESS          0x60
 //Note that MAX30102 has the same I2C address and Part ID
 
 #define I2C_SPEED_STANDARD        100000
@@ -222,12 +221,11 @@ static const uint8_t MAX30112_LED_RGE_200 = 0xF;
 static const uint8_t MAX30112_DISABLE = 0x00; //Generic disable byte
 
 
-
 class MAX30112 {
  public: 
   MAX30112(void);
 
-  boolean begin(TwoWire &wirePort = Wire, uint32_t i2cSpeed = I2C_SPEED_STANDARD, uint8_t i2creadaddr = MAX30112_READ_ADDRESS, uint8_t i2cwriteaddr = MAX30112_WRITE_ADDRESS);
+  boolean begin(TwoWire &wirePort = Wire, uint32_t i2cSpeed = I2C_SPEED_STANDARD, uint8_t i2caddr = MAX30112_ADDRESS);
 
   uint32_t getRed(void); //Returns immediate red value
   uint32_t getIR(void); //Returns immediate IR value
@@ -272,8 +270,7 @@ class MAX30112 {
 
  private:
   TwoWire *_i2cPort; //The generic connection to user's chosen I2C hardware
-  uint8_t _i2creadaddr;
-  uint8_t _i2cwriteaddr;
+  uint8_t _i2caddr;
 
   //activeLEDs is the number of channels turned on, and can be 1 to 3. 2 is common for Red+IR.
   byte activeLEDs; //Gets set during setup. Allows check() to calculate how many bytes to read from FIFO

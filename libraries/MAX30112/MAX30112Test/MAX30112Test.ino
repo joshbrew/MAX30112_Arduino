@@ -30,8 +30,8 @@ void setup()
     debug.println("MAX30112 was not found. Please check wiring/power. ");
     while (1);
   }
-
   pulseOx.setup(); //Configure sensor with default parameters. See code for config options
+ 
 }
 
 void loop()
@@ -43,4 +43,5 @@ void loop()
   debug.print("]");
 
   debug.println();
+  delay(1000);
 }

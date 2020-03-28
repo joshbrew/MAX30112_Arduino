@@ -171,8 +171,6 @@ static const uint8_t MAX30112_TINT_104 = 0x1; //17 Bit Resolution
 static const uint8_t MAX30112_TINT_206 = 0x2; //18 Bit Resolution
 static const uint8_t MAX30112_TINT_417 = 0x3; //19 Bit Resolution
 
-
-
 //MAX30112_PPG_CFG2
 static const uint8_t MAX30112_LED_SETLNG_MASK = (byte)~0b00011000;
 static const uint8_t MAX30112_SMP_AVE_MASK    = (byte)~0b00000111;
@@ -240,7 +238,7 @@ class MAX30112 {
   void shutDown(); 
   void wakeUp(); 
 
-  void setLEDMode(uint8_t fd1=MAX30112_FD_MODE_LED1, uint8_t fd2=MAX30112_FD_MODE_LED2, uint8_t fd3=MAX30112_FD_MODE_NONE, uint8_t fd4=MAX30112_FD_MODE_NONE);
+  void setLEDMode(uint8_t fd1=MAX30112_FD_MODE_LED1, uint8_t fd2=MAX30112_FD_MODE_LED2, uint8_t fd3=MAX30112_FD_MODE_AMBIENT, uint8_t fd4=MAX30112_FD_MODE_NONE);
 
   void setADCRange(uint8_t adcRange);
   void setSampleRate(uint8_t sampleRate);
@@ -258,13 +256,15 @@ class MAX30112 {
 
   uint8_t  getWritePointer(void);
   uint8_t  getReadPointer(void);
+  uint8_t  getOverflowCounter(void);
   void     clearFIFO(void); //Sets the read/write pointers to zero
 
   uint8_t  readPartID();
 
   
   // Setup the IC with user selectable settings
-  void setup(byte powerLevel = 0x1F, byte sampleAverage = 4, byte ledMode = 3, int sampleRate = 400, int pulseWidth = 411, int adcRange = 4096);
+  void setup( uint8_t ledMode = 3, uint8_t LEDpower = MAX30112_LED_RGE_50, uint8_t LEDintensity = 0xFF, uint8_t sampleAverage = MAX30112_SMP_AVE_4, uint8_t sampleRate = MAX30112_PPG_SR_1000, uint8_t pulseWidth = MAX30112_TINT_417, uint8_t ledSettling = MAX30112_LED_SETLNG_20, uint8_t adcRange = MAX30112_PPG_ADC_RGE_MAX);
+  void setupLPmode(); //Low power setting
 
   // Low-level I2C communication
   uint8_t readRegister8(uint8_t address, uint8_t reg);
@@ -278,7 +278,6 @@ class MAX30112 {
   //activeLEDs is the number of channels turned on, and can be 1 to 3. 2 is common for Red+IR.
   byte activeLEDs; //Gets set during setup. Allows check() to calculate how many bytes to read from FIFO
   
-  
   void bitMask(uint8_t reg, uint8_t mask, uint8_t thing);
  
   #define STORAGE_SIZE 4 //Each long is 4 bytes so limit this to fit on your micro
@@ -286,10 +285,12 @@ class MAX30112 {
   {
     uint32_t red[STORAGE_SIZE];
     uint32_t IR[STORAGE_SIZE];
+    uint32_t amb[STORAGE_SIZE];
+    uint32_t l4[STORAGE_SIZE];
     byte head;
     byte tail;
   } sense_struct; //This is our circular buffer of readings from the sensor
 
   sense_struct sense;
 
-}
+};

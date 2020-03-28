@@ -4,7 +4,7 @@ MAX30112::MAX30112() {
       //Constructor
   }
 
-boolean MAX30112::begin(TwoWire &wirePort = Wire, uint32_t i2cSpeed = I2C_SPEED_STANDARD, uint8_t i2creadaddr = MAX30112_READ_ADDRESS, uint8_t i2cwriteaddr = MAX30112_WRITE_ADDRESS) {
+boolean MAX30112::begin(TwoWire &wirePort, uint32_t i2cSpeed, uint8_t i2creadaddr, uint8_t i2cwriteaddr) {
 
     _i2cPort = &wirePort; //Grab which port the user wants us to use
 
@@ -38,7 +38,6 @@ uint32_t MAX30112::getIR(void){
 
 bool MAX30112::safeCheck(uint8_t maxTimeToCheck){
     uint32_t markTime = millis();
-    
     while(1)
     {
     if(millis() - markTime > maxTimeToCheck) return(false);
@@ -63,7 +62,7 @@ void MAX30112::wakeUp(){
     bitMask(MAX30112_SYSCTRL, MAX30112_SHDN_MASK, MAX30112_DISABLE);
   }
 
-void MAX30112::setLEDMode(uint8_t fd1=MAX30112_FD_MODE_LED1, uint8_t fd2=MAX30112_FD_MODE_LED2, uint8_t fd3=MAX30112_FD_MODE_NONE, uint8_t fd4=MAX30112_FD_MODE_NONE){
+void MAX30112::setLEDMode(uint8_t fd1, uint8_t fd2, uint8_t fd3, uint8_t fd4){
       bitMask(MAX30112_DATCTRL1, MAX30112_FD1_MASK, fd1);
       bitMask(MAX30112_DATCTRL1, MAX30112_FD2_MASK, fd2);
       bitMask(MAX30112_DATCTRL2, MAX30112_FD3_MASK, fd3);
@@ -102,6 +101,7 @@ uint16_t MAX30112::check(void)
   //Read register FIDO_DATA in (3-byte * number of active LED) chunks
   //Until FIFO_RD_PTR = FIFO_WR_PTR
 
+  byte ovfCounter = getOverflowCounter(); 
   byte readPointer = getReadPointer();
   byte writePointer = getWritePointer();
 
@@ -118,10 +118,10 @@ uint16_t MAX30112::check(void)
     //For this example we are just doing Red and IR (3 bytes each)
     int bytesLeftToRead = numberOfSamples * activeLEDs * 3;
 
-    //Get ready to read a burst of data from the FIFO register
-    //_i2cPort->beginTransmission(_i2creadaddr);
-    //_i2cPort->write(MAX30112_FIFODATA);
-    //_i2cPort->endTransmission();
+    //Get ready to read a burst of data from the FIFO register - MAX30105 code
+    _i2cPort->beginTransmission(_i2creadaddr);
+    _i2cPort->write(MAX30112_FIFO_DATA);
+    _i2cPort->endTransmission();
 
     //We may need to read as many as 288 bytes so we read in blocks no larger than I2C_BUFFER_LENGTH
     //I2C_BUFFER_LENGTH changes based on the platform. 64 bytes for SAMD21, 32 bytes for Uno.
@@ -133,7 +133,7 @@ uint16_t MAX30112::check(void)
       {
         //If toGet is 32 this is bad because we read 6 bytes (Red+IR * 3 = 6) at a time
         //32 % 6 = 2 left over. We don't want to request 32 bytes, we want to request 30.
-        //32 % 9 (Red+IR+GREEN) = 5 left over. We want to request 27.
+        //32 % 9 (Red+IR+AMBIENT) = 5 left over. We want to request 27.
 
         toGet = I2C_BUFFER_LENGTH - (I2C_BUFFER_LENGTH % (activeLEDs * 3)); //Trim toGet to be a multiple of the samples we need to read
       }
@@ -160,7 +160,7 @@ uint16_t MAX30112::check(void)
         //Convert array to long
         memcpy(&tempLong, temp, sizeof(tempLong));
 		
-		tempLong &= 0x3FFFF; //Zero out all but 18 bits
+		    tempLong &= 0x3FFFF; //Zero out all but 18 bits
 
         sense.red[sense.head] = tempLong; //Store this reading into the sense array
 
@@ -175,14 +175,14 @@ uint16_t MAX30112::check(void)
           //Convert array to long
           memcpy(&tempLong, temp, sizeof(tempLong));
 
-		  tempLong &= 0x3FFFF; //Zero out all but 18 bits
+		      tempLong &= 0x3FFFF; //Zero out all but 18 bits
           
-		  sense.IR[sense.head] = tempLong;
+		      sense.IR[sense.head] = tempLong;
         }
 
         if (activeLEDs > 2)
         {
-          //Burst read three more bytes - Green
+          //Burst read three more bytes - Ambient
           temp[3] = 0;
           temp[2] = _i2cPort->read();
           temp[1] = _i2cPort->read();
@@ -191,9 +191,24 @@ uint16_t MAX30112::check(void)
           //Convert array to long
           memcpy(&tempLong, temp, sizeof(tempLong));
 
-		  tempLong &= 0x3FFFF; //Zero out all but 18 bits
+		      tempLong &= 0x3FFFF; //Zero out all but 18 bits
 
-          sense.green[sense.head] = tempLong;
+          sense.amb[sense.head] = tempLong;
+        }
+        if (activeLEDs > 3)
+        {
+          //Burst read three more bytes - Ambient
+          temp[3] = 0;
+          temp[2] = _i2cPort->read();
+          temp[1] = _i2cPort->read();
+          temp[0] = _i2cPort->read();
+
+          //Convert array to long
+          memcpy(&tempLong, temp, sizeof(tempLong));
+
+		      tempLong &= 0x3FFFF; //Zero out all but 18 bits
+
+          sense.l4[sense.head] = tempLong;
         }
 
         toGet -= activeLEDs * 3;
@@ -207,7 +222,10 @@ uint16_t MAX30112::check(void)
 }
 
 uint8_t MAX30112::available(void){
-      
+    int8_t numberOfSamples = sense.head - sense.tail;
+    if (numberOfSamples < 0) numberOfSamples += STORAGE_SIZE;
+
+    return (numberOfSamples);
   }//Tells caller how many new samples are available (head - tail)
 
 void MAX30112::nextSample(void){
@@ -236,14 +254,8 @@ uint8_t MAX30112::getReadPointer(void) {
     return (readRegister8(_i2creadaddr, MAX30112_FIFO_RD_PTR));
   }
 
-  //Advance the tail
-void MAX30112::nextSample(void)
-{
-  if(available()) //Only advance the tail if new data is available
-  {
-    sense.tail++;
-    sense.tail %= STORAGE_SIZE; //Wrap condition
-  }
+uint8_t MAX30112::getOverflowCounter(void) {
+    return (readRegister8(_i2creadaddr, MAX30112_OVF_COUNTER));
 }
 
 void MAX30112::clearFIFO(void) {
@@ -257,8 +269,53 @@ uint8_t MAX30112::readPartID(){
   }
 
 // Setup the IC with user selectable settings
-void MAX30112::setup(byte powerLevel = 0x1F, byte sampleAverage = 4, byte ledMode = 3, int sampleRate = 400, int pulseWidth = 411, int adcRange = 4096){
+void MAX30112::setup( uint8_t ledMode, uint8_t LEDpower, uint8_t LEDintensity, uint8_t sampleAverage, uint8_t sampleRate, uint8_t pulseWidth, uint8_t ledSettling, uint8_t adcRange) {
     
+    //Set LED mode
+    activeLEDs = ledMode;
+    if(ledMode == 1){
+      bitMask(MAX30112_DATCTRL1,MAX30112_FD1_MASK,MAX30112_FD_MODE_LED1);
+      bitMask(MAX30112_DATCTRL1,MAX30112_FD2_MASK,MAX30112_FD_MODE_NONE);
+      bitMask(MAX30112_DATCTRL2,MAX30112_FD3_MASK,MAX30112_FD_MODE_NONE);
+      bitMask(MAX30112_DATCTRL2,MAX30112_FD4_MASK,MAX30112_FD_MODE_NONE);
+    }
+    else if(ledMode == 2){
+      bitMask(MAX30112_DATCTRL1,MAX30112_FD1_MASK,MAX30112_FD_MODE_LED1);
+      bitMask(MAX30112_DATCTRL1,MAX30112_FD2_MASK,MAX30112_FD_MODE_LED2);
+      bitMask(MAX30112_DATCTRL2,MAX30112_FD3_MASK,MAX30112_FD_MODE_NONE);
+      bitMask(MAX30112_DATCTRL2,MAX30112_FD4_MASK,MAX30112_FD_MODE_NONE);
+    }
+    else if(ledMode == 3){
+      bitMask(MAX30112_DATCTRL1,MAX30112_FD1_MASK,MAX30112_FD_MODE_LED1);
+      bitMask(MAX30112_DATCTRL1,MAX30112_FD2_MASK,MAX30112_FD_MODE_LED2);
+      bitMask(MAX30112_DATCTRL2,MAX30112_FD3_MASK,MAX30112_FD_MODE_AMBIENT);
+      bitMask(MAX30112_DATCTRL2,MAX30112_FD4_MASK,MAX30112_FD_MODE_NONE);
+    }
+    else if(ledMode == 4){
+      bitMask(MAX30112_DATCTRL1,MAX30112_FD1_MASK,MAX30112_FD_MODE_LED1);
+      bitMask(MAX30112_DATCTRL1,MAX30112_FD2_MASK,MAX30112_FD_MODE_LED2);
+      bitMask(MAX30112_DATCTRL2,MAX30112_FD3_MASK,MAX30112_FD_MODE_AMBIENT);
+      bitMask(MAX30112_DATCTRL2,MAX30112_FD4_MASK,MAX30112_FD_MODE_LED1P2);
+    }
+    //Set LED_PA and LED_RGE
+    setPulseAmplitudeRed(LEDpower, LEDintensity);
+    setPulseAmplitudeIR(LEDpower, LEDintensity);
+
+    //Set PPG_ADC_RGE
+    setADCRange(adcRange);
+    //Set PPG_SR
+    setSampleRate(sampleRate);
+    //Set PPG_TINT
+    setPulseWidth(pulseWidth);
+    //Set SMP_AVG
+    bitMask(MAX30112_PPG_CFG2, MAX30112_SMP_AVE_MASK, sampleAverage);
+    //Set LED_SETLNG
+    bitMask(MAX30112_PPG_CFG2, MAX30112_LED_SETLNG_MASK, ledSettling);
+
+    //System settings
+    bitMask(MAX30112_FIFOCONFIG, MAX30112_FIFO_RO_MASK, MAX30112_FIFO_RO); //Sets automatic rollover of new data
+
+    clearFIFO();
   }
 
   // Low-level I2C communication

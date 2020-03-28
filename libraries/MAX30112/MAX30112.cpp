@@ -51,7 +51,17 @@ bool MAX30112::safeCheck(uint8_t maxTimeToCheck){
   // Configuration
 void MAX30112::softReset(){
     bitMask(MAX30112_SYSCTRL, MAX30112_RESET_MASK, MAX30112_RESET);
-  }
+
+      // Poll for bit to clear, reset is then complete
+    // Timeout after 100ms
+    unsigned long startTime = millis();
+    while (millis() - startTime < 100)
+    {
+      uint8_t response = readRegister8(_i2caddr, MAX30112_MODECONFIG);
+      if ((response & MAX30112_RESET) == 0) break; //We're done!
+      delay(1); //Let's not over burden the I2C bus
+    }
+}
 
 void MAX30112::shutDown(){
     bitMask(MAX30112_SYSCTRL, MAX30112_SHDN_MASK, MAX30112_SHDN);   

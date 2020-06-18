@@ -16,7 +16,7 @@ boolean MAX30112::begin(TwoWire &wirePort, uint32_t i2cSpeed, uint8_t i2caddr) {
     // Step 1: Initial Communication and Verification
     // Check that a MAX30112 is connected
     // Set modes for the MAX30112
-    
+
   }
 
 uint32_t MAX30112::getRed(void){
@@ -51,17 +51,7 @@ bool MAX30112::safeCheck(uint8_t maxTimeToCheck){
   // Configuration
 void MAX30112::softReset(){
     bitMask(MAX30112_SYSCTRL, MAX30112_RESET_MASK, MAX30112_RESET);
-
-      // Poll for bit to clear, reset is then complete
-    // Timeout after 100ms
-    unsigned long startTime = millis();
-    while (millis() - startTime < 100)
-    {
-      uint8_t response = readRegister8(_i2caddr, MAX30112_MODECONFIG);
-      if ((response & MAX30112_RESET) == 0) break; //We're done!
-      delay(1); //Let's not over burden the I2C bus
-    }
-}
+  }
 
 void MAX30112::shutDown(){
     bitMask(MAX30112_SYSCTRL, MAX30112_SHDN_MASK, MAX30112_SHDN);   
@@ -278,7 +268,7 @@ uint8_t MAX30112::readPartID(){
   }
 
 // Setup the IC with user selectable settings
-void MAX30112::setup( uint8_t ledMode, uint8_t LEDpower, uint8_t LEDintensity, uint8_t sampleAverage, uint8_t sampleRate, uint8_t pulseWidth, uint8_t ledSettling, uint8_t adcRange) {
+void MAX30112::setup( uint8_t ledMode, uint8_t LED_PA, uint8_t LED_RGE, uint8_t sampleAverage, uint8_t sampleRate, uint8_t pulseWidth, uint8_t ledSettling, uint8_t adcRange) {
     
     //Set LED mode
     activeLEDs = ledMode;
@@ -295,8 +285,8 @@ void MAX30112::setup( uint8_t ledMode, uint8_t LEDpower, uint8_t LEDintensity, u
       setLEDMode(MAX30112_FD_MODE_LED1,MAX30112_FD_MODE_LED2,MAX30112_FD_MODE_AMBIENT,MAX30112_FD_MODE_LED1P2);
     }
     //Set LED_PA and LED_RGE
-    setPulseAmplitudeRed(LEDpower, LEDintensity);
-    setPulseAmplitudeIR(LEDpower, LEDintensity);
+    setPulseAmplitudeRed(LED_PA, LED_RGE);
+    setPulseAmplitudeIR(LED_PA, LED_RGE);
 
     //Set PPG_ADC_RGE
     setADCRange(adcRange);

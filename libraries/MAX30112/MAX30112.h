@@ -12,8 +12,9 @@
 
 #include <Wire.h>
 
-#define MAX30112_ADDRESS          0x60
-//Note that MAX30102 has the same I2C address and Part ID
+#define MAX30112_ADDRESS          0x60 //0b1100000
+#define MAX30112_WRITE            0xC1
+#define MAX30112_READ             0xC0
 
 #define I2C_SPEED_STANDARD        100000
 #define I2C_SPEED_FAST            400000
@@ -32,7 +33,7 @@
 #else
 
   //The catch-all default is 32
-  #define I2C_BUFFER_LENGTH 32
+  //#define I2C_BUFFER_LENGTH 32
 
 #endif
 
@@ -221,6 +222,7 @@ static const uint8_t MAX30112_LED_RGE_200 = 0xF;
 static const uint8_t MAX30112_DISABLE = 0x00; //Generic disable byte
 
 
+
 class MAX30112 {
  public: 
   MAX30112(void);
@@ -261,7 +263,7 @@ class MAX30112 {
 
   
   // Setup the IC with user selectable settings
-  void setup( uint8_t ledMode = 3, uint8_t LEDpower = MAX30112_LED_RGE_50, uint8_t LEDintensity = 0xFF, uint8_t sampleAverage = MAX30112_SMP_AVE_4, uint8_t sampleRate = MAX30112_PPG_SR_1000, uint8_t pulseWidth = MAX30112_TINT_417, uint8_t ledSettling = MAX30112_LED_SETLNG_20, uint8_t adcRange = MAX30112_PPG_ADC_RGE_MAX);
+  void setup( uint8_t ledMode = 3, uint8_t LED_PA = MAX30112_LED_RGE_50, uint8_t LED_RGE = 0xFF, uint8_t sampleAverage = MAX30112_SMP_AVE_4, uint8_t sampleRate = MAX30112_PPG_SR_1000, uint8_t pulseWidth = MAX30112_TINT_417, uint8_t ledSettling = MAX30112_LED_SETLNG_20, uint8_t adcRange = MAX30112_PPG_ADC_RGE_MAX);
   void setupLPmode(); //Low power setting
 
   // Low-level I2C communication
